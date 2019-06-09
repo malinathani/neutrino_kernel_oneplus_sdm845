@@ -211,8 +211,6 @@ int irq_do_set_affinity(struct irq_data *data, const struct cpumask *mask,
 	struct irq_chip *chip = irq_data_get_irq_chip(data);
 	int ret;
 
-	/* IRQs only run on the first CPU in the affinity mask; reflect that */
-	mask = cpumask_of(cpumask_first(mask));
 	ret = chip->irq_set_affinity(data, mask, force);
 	switch (ret) {
 	case IRQ_SET_MASK_OK:
@@ -1207,6 +1205,7 @@ static void affine_one_perf_irq(struct irq_desc *desc)
 	int cpu;
 
 	/* Balance the performance-critical IRQs across all perf CPUs */
+	get_online_cpus();
 	while (1) {
 		cpu = cpumask_next_and(perf_cpu_index, cpu_perf_mask,
 				       cpu_online_mask);
@@ -1215,6 +1214,7 @@ static void affine_one_perf_irq(struct irq_desc *desc)
 		perf_cpu_index = -1;
 	}
 	irq_set_affinity_locked(&desc->irq_data, cpumask_of(cpu), true);
+	put_online_cpus();
 
 	perf_cpu_index = cpu;
 }
