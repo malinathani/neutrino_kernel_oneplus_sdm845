@@ -1691,7 +1691,10 @@ static ssize_t cpuset_write_resmask(struct kernfs_open_file *of,
 	struct cpuset *trialcs;
 	int retval = -ENODEV;
 
+#ifndef CONFIG_CPUSET_ASSIST
+	/* Don't call strstrip here because buf is read-only */
 	buf = strstrip(buf);
+#endif
 
 	/*
 	 * CPU or memory hotunplug may leave @cs w/o any execution
@@ -1747,6 +1750,33 @@ out_unlock:
 	css_put(&cs->css);
 	flush_workqueue(cpuset_migrate_mm_wq);
 	return retval ?: nbytes;
+}
+
+static ssize_t cpuset_write_resmask_wrapper(struct kernfs_open_file *of,
+					 char *buf, size_t nbytes, loff_t off)
+{
+#ifdef CONFIG_CPUSET_ASSIST
+	int i;
+	struct cpuset *cs = css_cs(of_css(of));
+	char *target_cpusets[] =
+	{ "audio-app", "top-app", "foreground",
+	  "background", "system-background", "restricted" };
+	char *target_cpus[] =
+	{ "0-3", "0-7", "0-3,6-7", "0-1", "0-3", "0-3" };
+
+	BUILD_BUG_ON(ARRAY_SIZE(target_cpusets) != ARRAY_SIZE(target_cpus));
+
+	if (!strcmp(current->comm, "init")) {
+		for (i = 0; i < ARRAY_SIZE(target_cpusets); i++) {
+			if (!strcmp(cs->css.cgroup->kn->name, target_cpusets[i]))
+				return cpuset_write_resmask(of, target_cpus[i], nbytes, off);
+		}
+	}
+#endif
+
+	buf = strstrip(buf);
+
+	return cpuset_write_resmask(of, buf, nbytes, off);
 }
 
 /*
@@ -1841,7 +1871,7 @@ static struct cftype files[] = {
 	{
 		.name = "cpus",
 		.seq_show = cpuset_common_seq_show,
-		.write = cpuset_write_resmask,
+		.write = cpuset_write_resmask_wrapper,
 		.max_write_len = (100U + 6 * NR_CPUS),
 		.private = FILE_CPULIST,
 	},
