@@ -1755,7 +1755,7 @@ out_unlock:
 static ssize_t cpuset_write_resmask_wrapper(struct kernfs_open_file *of,
 					 char *buf, size_t nbytes, loff_t off)
 {
-#ifdef CONFIG_CPUSETS_ASSIST
+#ifdef CONFIG_CPUSET_ASSIST
 	int i;
 	struct cpuset *cs = css_cs(of_css(of));
 	char *target_cpusets[] =
